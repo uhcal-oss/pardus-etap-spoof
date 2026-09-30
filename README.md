@@ -81,11 +81,23 @@ Status: ACTIVE (Pardus ETAP 23)
 etap-spoof meb-check
 ```
 
-### 4. Orijinal Dağıtıma Geri Dönme
+### 4. İzole / Kum Havuzu (Sandbox) Olarak Çalıştırma (Önerilen)
+Sistem genelindeki `/etc/os-release` dosyasını değiştirmeden, **sadece belirli bir komut veya aracı** izole bir mount namespace (bwrap) içinde Pardus ETAP 23 olarak çalıştırmak için:
+```bash
+etap-spoof run <komut> [parametreler...]
+```
+Örnekler:
+```bash
+etap-spoof run fastfetch            # Sadece bu komutta Pardus ETAP gösterir
+etap-spoof run python3 script.py    # Betik sistemi Pardus ETAP 23 olarak okur
+```
+*Bu modda ana sisteminiz (`dnf`, `fastfetch`, GNOME vb.) %100 saf Fedora olarak kalır; hiçbir sistem dosyası değiştirilmez ve sudo yetkisi gerektirmez.*
+
+### 5. Orijinal Dağıtıma Geri Dönme
 ```bash
 sudo etap-spoof disable
 ```
-*Tüm ETAP kimlik dosyalarını temizler ve Fedora orijinal sembolik linklerini geri yükler.*
+*Tüm sistem çapındaki ETAP kimlik dosyalarını ve DNF değişkenlerini temizler, Fedora orijinal sembolik linklerini geri yükler.*
 
 ---
 

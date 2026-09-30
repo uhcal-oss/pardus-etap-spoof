@@ -238,7 +238,49 @@ def disable_spoof():
             os.remove(f)
             print(f"  [-] Removed {f}")
 
+    # 4. Remove DNF variables override
+    for f in ["/etc/dnf/vars/releasever", "/etc/dnf/vars/basearch"]:
+        if os.path.exists(f):
+            os.remove(f)
+            print(f"  [-] Removed {f}")
+
     print("\n[✓] Native Fedora identity restored!")
+
+def run_isolated(cmd_args):
+    """Runs a command inside an isolated mount namespace (bwrap) so only that process sees Pardus ETAP."""
+    if not cmd_args:
+        print("[!] No command specified to run. Usage: etap-spoof run <command> [args...]", file=sys.stderr)
+        sys.exit(1)
+
+    isolated_dir = "/tmp/pardus-etap-isolated"
+    os.makedirs(isolated_dir, exist_ok=True)
+    with open(os.path.join(isolated_dir, "os-release"), "w") as f:
+        f.write(ETAP_OS_RELEASE)
+    with open(os.path.join(isolated_dir, "lsb-release"), "w") as f:
+        f.write(ETAP_LSB_RELEASE)
+    with open(os.path.join(isolated_dir, "issue"), "w") as f:
+        f.write(ETAP_ISSUE)
+    with open(os.path.join(isolated_dir, "debian_version"), "w") as f:
+        f.write(ETAP_DEBIAN_VERSION)
+    with open(os.path.join(isolated_dir, "pardus-release"), "w") as f:
+        f.write(ETAP_PARDUS_RELEASE)
+
+    bwrap_cmd = [
+        "bwrap",
+        "--dev-bind", "/", "/",
+        "--ro-bind", os.path.join(isolated_dir, "os-release"), "/etc/os-release",
+        "--ro-bind", os.path.join(isolated_dir, "lsb-release"), "/etc/lsb-release",
+        "--ro-bind", os.path.join(isolated_dir, "issue"), "/etc/issue",
+        "--ro-bind", os.path.join(isolated_dir, "debian_version"), "/etc/debian_version",
+        "--ro-bind", os.path.join(isolated_dir, "pardus-release"), "/etc/pardus-release",
+        *cmd_args
+    ]
+    try:
+        res = subprocess.run(bwrap_cmd)
+        sys.exit(res.returncode)
+    except FileNotFoundError:
+        print("[!] 'bwrap' command not found. Please install bubblewrap.", file=sys.stderr)
+        sys.exit(1)
 
 def print_status():
     active = is_spoof_active()
@@ -297,10 +339,11 @@ def print_status():
 
 def main():
     if len(sys.argv) < 2 or sys.argv[1] in ["-h", "--help", "help"]:
-        print("Usage: etap-spoof [enable|disable|status|meb-check]")
+        print("Usage: etap-spoof [enable|disable|status|meb-check|run <cmd>]")
         print("Commands:")
-        print("  enable     Spoof system as official Pardus ETAP 23 GNU/Linux")
+        print("  enable     Spoof system as official Pardus ETAP 23 GNU/Linux (global)")
         print("  disable    Revert system to native Fedora identity")
+        print("  run <cmd>  Run a specific command isolated as Pardus ETAP without touching system files")
         print("  status     Display current spoofing status and MEB telemetry")
         print("  meb-check  Query MEB EBA central backend for board registration")
         sys.exit(0)
@@ -310,6 +353,8 @@ def main():
         enable_spoof()
     elif cmd in ["disable", "off", "revert", "stop"]:
         disable_spoof()
+    elif cmd in ["run", "exec"]:
+        run_isolated(sys.argv[2:])
     elif cmd in ["status", "info"]:
         print_status()
     elif cmd in ["meb-check", "check"]:
